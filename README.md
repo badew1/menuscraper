@@ -1,1 +1,3 @@
-# menuscraper
+Scraping program using selenium that retrieves a comprehensive list of foods on today's menu at my school's dining hall. You can choose which dining hall (banRighHall, leonardHall, or jeanRoyceHall) and which meal (Breakfast, Lunch, or Dinner) to view the menu for.
+
+After scraping the menu, you can choose to send an email of the full list wherever you'd like, through user input. Like an email notification system.
