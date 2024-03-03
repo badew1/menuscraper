@@ -1,56 +1,75 @@
 import time
 import datetime
+import logging
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-#retrieves the current date for up-to-date menu 
 def date_now():
-    date = datetime.datetime.now()
-    final = date.strftime("%-m-%-d-%Y")
-    return final
+    """Retrieves the current date formatted for the URL."""
+    return datetime.datetime.now().strftime("%-m-%-d-%Y")
 
-def get_menu(meal, hall):
+def setup_driver(headless=True):
+    """Initializes the Selenium WebDriver with optional headless mode."""
+    options = Options()
+    if headless:
+        options.add_argument('--headless')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--no-sandbox')
+        options.add_argument('window-size=1920x1080')
+        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36')
+    driver = webdriver.Chrome(options=options)
+    return driver
+
+
+def get_menu(driver, meal, hall):
     """
-    :param meal: represents what meal of the day the user is looking for (Breakfast, Lunch, Dinner)
-    :param hall: gets the menu of whichever dining hall is selected (banRighHall, jeanRoyceHall, or leonardHall)
+    Fetches the menu for a specific meal and dining hall.
+    
+    :param driver: Selenium WebDriver instance.
+    :param meal: Meal type (Breakfast, Lunch, Dinner).
+    :param hall: Dining hall identifier.
+    :return: Menu list as a string or None if not available.
     """
+    try:
+        driver.get('https://www.queensu.ca/food/eat-now/todays-menu')
 
-    url = 'https://www.queensu.ca/food/eat-now/todays-menu'
-    driver = webdriver.Chrome()
-    driver.get(url)
+        button = driver.find_element(By.ID, hall)
+        driver.execute_script("arguments[0].scrollIntoView();", button)
+        button.click()
 
+        date_value = date_now()
+        date_radio_button = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, f"//input[@name='selDate'][@value='{date_value}']")))
+        date_radio_button.find_element(By.XPATH, "./..").click()
 
-    button = driver.find_element(By.ID, hall)
-    driver.execute_script("arguments[0].scrollIntoView();", button)
-    button.click()
+        meal_radio_button = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, f"//input[@name='mealPeriod'][@value='{meal}']")))
+        meal_radio_button.find_element(By.XPATH, "./..").click()
+    
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.CLASS_NAME, "menuItemHeader")))
+        foods = driver.find_elements(By.CLASS_NAME, "menuItemHeader")
 
-    date_value = date_now()
-    # Wait until the input element with the specific value is present
-    wait = WebDriverWait(driver, 10)
-    date_radio_button = wait.until(EC.presence_of_element_located((By.XPATH, f"//input[@name='selDate'][@value='{date_value}']")))
+        return "\n".join(food.text for food in foods)
+    
+    except Exception as e:
+        logging.error(f"Error fetching menu for {hall}: {e}")
+        return
 
-    #Click the parent label of the input element
-    date_button = date_radio_button.find_element(By.XPATH, "./..")
-    #driver.execute_script("arguments[0].scrollIntoView();", parent_label)
-    date_button.click()
-
-    wait = WebDriverWait(driver, 10)
-    meal_radio_button = wait.until(EC.presence_of_element_located((By.XPATH, f"//input[@name='mealPeriod'][@value='{meal}']")))
-    meal_label = meal_radio_button.find_element(By.XPATH, "./..")
-    #driver.execute_script("arguments[0].scrollIntoView();", meal_label)
-    meal_label.click()
-
-
-    time.sleep(3)
-
-    foods = driver.find_elements(By.CLASS_NAME, "menuItemHeader")
-
-    list = "\n".join([food.text for food in foods])
-
-    return list
+def main():
+    logging.basicConfig(level=logging.INFO)
+    driver = setup_driver()
+    try:
+        menu = get_menu(driver, "Dinner", "leonardHall")
+        if menu:
+            print(menu)
+        else:
+            print("Menu not available.")
+    finally:
+        driver.quit()
 
 if __name__ == "__main__":
-    menu = get_menu("Breakfast", "leonardHall")
-    print(menu)
+    main()
